@@ -8,6 +8,7 @@ import (
 	"github.com/go-utils/ugo"
 	"github.com/go-utils/uslice"
 	"github.com/go-utils/ustr"
+	"github.com/tmc/xsd"
 
 	xsdt "github.com/metaleap/go-xsd/types"
 )
@@ -52,9 +53,9 @@ func (me *pkgStacks) CurName() (r xsdt.NCName) {
 	return
 }
 
-func (me *pkgStacks) CurSimpleType() (r *SimpleType) {
+func (me *pkgStacks) CurSimpleType() (r *xsd.SimpleType) {
 	if len(me.SimpleType) > 0 {
-		r = me.SimpleType[0].(*SimpleType)
+		r = me.SimpleType[0].(*xsd.SimpleType)
 	}
 	return
 }
@@ -67,14 +68,14 @@ func (me *pkgStacks) FullName() (r string) {
 }
 
 type PkgBag struct {
-	Schema *Schema
+	Schema *xsd.Schema
 	Stacks pkgStacks
 
-	allAtts       []*Attribute
-	allAttGroups  []*AttributeGroup
-	allElems      []*Element
-	allElemGroups []*Group
-	allNotations  []*Notation
+	allAtts       []*xsd.Attribute
+	allAttGroups  []*xsd.AttributeGroup
+	allElems      []*xsd.Element
+	allElemGroups []*xsd.Group
+	allNotations  []*xsd.Notation
 
 	ctd                                                                                          *declType
 	lines                                                                                        []string
@@ -83,18 +84,18 @@ type PkgBag struct {
 	imports, attsCache, elemsCacheOnce, elemsCacheMult, simpleBaseTypes, simpleContentValueTypes map[string]string
 	impsUsed, elemsWritten, parseTypes, walkerTypes, declConvs                                   map[string]bool
 	anonCounts                                                                                   map[string]uint64
-	attGroups, attGroupRefImps                                                                   map[*AttributeGroup]string
-	attsKeys, attRefImps                                                                         map[*Attribute]string
+	attGroups, attGroupRefImps                                                                   map[*xsd.AttributeGroup]string
+	attsKeys, attRefImps                                                                         map[*xsd.Attribute]string
 	declTypes                                                                                    map[string]*declType
-	declElemTypes                                                                                map[element][]*declType
+	declElemTypes                                                                                map[xsd.XSDElement][]*declType
 	declWrittenTypes                                                                             []*declType
-	elemGroups, elemGroupRefImps                                                                 map[*Group]string
-	elemChoices, elemChoiceRefImps                                                               map[*Choice]string
-	elemSeqs, elemSeqRefImps                                                                     map[*Sequence]string
-	elemKeys, elemRefImps                                                                        map[*Element]string
+	elemGroups, elemGroupRefImps                                                                 map[*xsd.Group]string
+	elemChoices, elemChoiceRefImps                                                               map[*xsd.Choice]string
+	elemSeqs, elemSeqRefImps                                                                     map[*xsd.Sequence]string
+	elemKeys, elemRefImps                                                                        map[*xsd.Element]string
 }
 
-func newPkgBag(schema *Schema) (bag *PkgBag) {
+func newPkgBag(schema *xsd.Schema) (bag *PkgBag) {
 	bag = &PkgBag{Schema: schema}
 	bag.impName = "xsdt"
 	/*
@@ -131,7 +132,7 @@ func newPkgBag(schema *Schema) (bag *PkgBag) {
 	return
 }
 
-func (me *PkgBag) addType(elem element, n, t string, a ...*Annotation) (dt *declType) {
+func (me *PkgBag) addType(elem xsd.XSDElement, n, t string, a ...*xsd.Annotation) (dt *declType) {
 	dt = &declType{elem: elem, Name: n, Type: t, Annotations: a}
 	dt.Embeds, dt.Fields, dt.Methods, dt.memberWritten = map[string]*declEmbed{}, map[string]*declField{}, map[string]*declMethod{}, map[string]bool{}
 	me.ctd, me.declTypes[n] = dt, dt
@@ -165,7 +166,7 @@ func (me *PkgBag) appendFmt(addLineAfter bool, format string, fmtArgs ...interfa
 func (me *PkgBag) assembleSource() string {
 	var (
 		dt     *declType
-		render = func(el element) {
+		render = func(el xsd.XSDElement) {
 			for _, dt = range me.declElemTypes[el] {
 				if dt != nil {
 					dt.render(me)
@@ -184,8 +185,8 @@ func (me *PkgBag) assembleSource() string {
 		me.impsUsed[me.impName] = true
 		me.appendFmt(false, "var %sNotations = new(%s.Notations)\n\nfunc init () {", idPrefix, me.impName)
 		for _, not := range me.allNotations {
-			not.makePkg(me)
-			log.Println("was makePkg()")
+			//not.makePkg(me)
+			log.Println("was makePkg()", not)
 		}
 		me.appendFmt(true, "}")
 	}
@@ -313,8 +314,8 @@ func (me *PkgBag) xsdStringTypeRef() string {
 
 type declEmbed struct {
 	Name          string
-	Annotations   []*Annotation
-	elem          element
+	Annotations   []*xsd.Annotation
+	elem          xsd.XSDElement
 	finalTypeName string
 }
 
@@ -323,7 +324,8 @@ func (me *declEmbed) render(bag *PkgBag, dt *declType) {
 		dt.memberWritten["E_"+n] = true
 		for _, ann := range me.Annotations {
 			if ann != nil {
-				ann.makePkg(bag)
+				log.Println("Ann makePkg")
+				//ann.makePkg(bag)
 			}
 		}
 		me.finalTypeName = bag.rewriteTypeSpec(n)
@@ -333,15 +335,16 @@ func (me *declEmbed) render(bag *PkgBag, dt *declType) {
 
 type declField struct {
 	Name, Type, XmlTag string
-	Annotations        []*Annotation
-	elem               element
+	Annotations        []*xsd.Annotation
+	elem               xsd.XSDElement
 	finalTypeName      string
 }
 
 func (me *declField) render(bag *PkgBag, dt *declType) {
 	for _, ann := range me.Annotations {
 		if ann != nil {
-			ann.makePkg(bag)
+			log.Println("Ann makePkg")
+			//ann.makePkg(bag)
 		}
 	}
 	me.finalTypeName = bag.rewriteTypeSpec(me.Type)
@@ -350,14 +353,15 @@ func (me *declField) render(bag *PkgBag, dt *declType) {
 
 type declMethod struct {
 	Body, Doc, Name, ReceiverType, ReturnType string
-	Annotations                               []*Annotation
-	elem                                      element
+	Annotations                               []*xsd.Annotation
+	elem                                      xsd.XSDElement
 }
 
 func (me *declMethod) render(bag *PkgBag, dt *declType) {
 	for _, ann := range me.Annotations {
 		if ann != nil {
-			ann.makePkg(bag)
+			//			ann.makePkg(bag)
+			log.Println("Ann makePkg")
 		}
 	}
 	bag.appendFmt(false, "//\t%s", me.Doc)
@@ -368,31 +372,31 @@ func (me *declMethod) render(bag *PkgBag, dt *declType) {
 type declType struct {
 	EquivalentTo, Name, Type string
 	Embeds                   map[string]*declEmbed
-	Annotations              []*Annotation
+	Annotations              []*xsd.Annotation
 	Fields                   map[string]*declField
 	Methods                  map[string]*declMethod
-	elem                     element
+	elem                     xsd.XSDElement
 	memberWritten            map[string]bool
 	rendered                 bool
 }
 
-func (me *declType) addAnnotations(a ...*Annotation) {
+func (me *declType) addAnnotations(a ...*xsd.Annotation) {
 	me.Annotations = append(me.Annotations, a...)
 }
 
-func (me *declType) addField(elem element, n, t, x string, a ...*Annotation) (f *declField) {
+func (me *declType) addField(elem xsd.XSDElement, n, t, x string, a ...*xsd.Annotation) (f *declField) {
 	f = &declField{elem: elem, Name: n, Type: t, XmlTag: x, Annotations: a}
 	me.Fields[n] = f
 	return
 }
 
-func (me *declType) addEmbed(elem element, name string, a ...*Annotation) (e *declEmbed) {
+func (me *declType) addEmbed(elem xsd.XSDElement, name string, a ...*xsd.Annotation) (e *declEmbed) {
 	e = &declEmbed{elem: elem, Name: name, Annotations: a}
 	me.Embeds[name] = e
 	return
 }
 
-func (me *declType) addMethod(elem element, recType, name, retType, body, doc string, a ...*Annotation) (m *declMethod) {
+func (me *declType) addMethod(elem xsd.XSDElement, recType, name, retType, body, doc string, a ...*xsd.Annotation) (m *declMethod) {
 	m = &declMethod{elem: elem, Body: body, Doc: doc, Name: name, ReceiverType: recType, ReturnType: retType, Annotations: a}
 	me.Methods[name] = m
 	return
@@ -463,7 +467,8 @@ func (me *declType) render(bag *PkgBag) {
 			var myName = me.Name
 			for _, ann := range me.Annotations {
 				if ann != nil {
-					ann.makePkg(bag)
+					//	ann.makePkg(bag)
+					log.Println("Ann makePkg")
 				}
 			}
 			for _, e := range me.Embeds {

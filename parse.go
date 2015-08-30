@@ -4,8 +4,6 @@ import (
 	"encoding/xml"
 	"io"
 	"io/ioutil"
-
-	"github.com/davecgh/go-spew/spew"
 )
 
 func ParseXSD(xsd io.Reader) (*Schema, error) {
@@ -14,10 +12,8 @@ func ParseXSD(xsd io.Reader) (*Schema, error) {
 	if err != nil {
 		return nil, err
 	}
-	spew.Dump(in)
 	if err := xml.Unmarshal(in, &value); err != nil {
 		return nil, err
 	}
-	spew.Dump(value)
 	return value, nil
 }

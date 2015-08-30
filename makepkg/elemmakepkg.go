@@ -1,16 +1,5 @@
 package xsd
 
-import (
-	"fmt"
-	"log"
-	"path"
-	"strings"
-
-	"github.com/go-utils/ustr"
-
-	xsdt "github.com/metaleap/go-xsd/types"
-)
-
 const (
 	idPrefix    = ""
 	protSep     = "://"
@@ -20,6 +9,7 @@ const (
 	xsdNamespaceUri = "http://www.w3.org/2001/XMLSchema"
 )
 
+/*
 func (me *All) makePkg(bag *PkgBag) {
 	me.elemBase.beforeMakePkg(bag)
 	me.hasElemsElement.makePkg(bag)
@@ -76,13 +66,11 @@ func (me *Attribute) makePkg(bag *PkgBag) {
 			defName, defVal = "Fixed", me.Fixed
 		}
 		key = "makePkgSAFENAME"
-		/*
 			if me.Parent() == bag.Schema {
 				key = safeName
 			} else {
 				key = safeName + "" + bag.safeName(typeName) + "" + bag.safeName(defVal)
 			}
-		*/
 		if len(bag.attsCache[key]) == 0 {
 			tmp = idPrefix + "HasAttr" + key
 			bag.attsKeys[me] = key
@@ -109,39 +97,39 @@ func (me *Attribute) makePkg(bag *PkgBag) {
 }
 
 func (me *AttributeGroup) makePkg(bag *PkgBag) {
-	var refName, refImp string
-	me.elemBase.beforeMakePkg(bag)
-	me.hasElemsAttribute.makePkg(bag)
-	me.hasElemsAnyAttribute.makePkg(bag)
-	me.hasElemsAttributeGroup.makePkg(bag)
-	if len(me.Ref) > 0 {
-		if len(bag.attGroups[me]) == 0 {
-			refName = bag.resolveQnameRef(me.Ref.String(), "", &refImp)
-			bag.attGroups[me] = idPrefix + "HasAtts" + refName
-			bag.attGroupRefImps[me] = refImp
-		}
-	} else {
-		safeName := bag.safeName(me.Name.String())
-		tmp := idPrefix + "HasAtts" + safeName
-		var td = bag.addType(me, tmp, "", me.Annotation)
-		bag.attGroups[me] = tmp
-		for _, ag := range me.AttributeGroups {
-			if len(ag.Ref) == 0 {
-				ag.Ref.Set(ag.Name.String())
+		var refName, refImp string
+		me.elemBase.beforeMakePkg(bag)
+		me.hasElemsAttribute.makePkg(bag)
+		me.hasElemsAnyAttribute.makePkg(bag)
+		me.hasElemsAttributeGroup.makePkg(bag)
+		if len(me.Ref) > 0 {
+			if len(bag.attGroups[me]) == 0 {
+				refName = bag.resolveQnameRef(me.Ref.String(), "", &refImp)
+				bag.attGroups[me] = idPrefix + "HasAtts" + refName
+				bag.attGroupRefImps[me] = refImp
 			}
-			if refName = bag.resolveQnameRef(ag.Ref.String(), "", &refImp); len(refImp) > 0 {
-				td.addEmbed(ag, refImp+"."+idPrefix+"HasAtts"+refName[(len(refImp)+1):], ag.Annotation)
-			} else {
-				td.addEmbed(ag, idPrefix+"HasAtts"+refName, ag.Annotation)
+		} else {
+			safeName := bag.safeName(me.Name.String())
+			tmp := idPrefix + "HasAtts" + safeName
+			var td = bag.addType(me, tmp, "", me.Annotation)
+			bag.attGroups[me] = tmp
+			for _, ag := range me.AttributeGroups {
+				if len(ag.Ref) == 0 {
+					ag.Ref.Set(ag.Name.String())
+				}
+				if refName = bag.resolveQnameRef(ag.Ref.String(), "", &refImp); len(refImp) > 0 {
+					td.addEmbed(ag, refImp+"."+idPrefix+"HasAtts"+refName[(len(refImp)+1):], ag.Annotation)
+				} else {
+					td.addEmbed(ag, idPrefix+"HasAtts"+refName, ag.Annotation)
+				}
+			}
+			for _, att := range me.Attributes {
+				if key := bag.attsKeys[att]; len(key) > 0 {
+					td.addEmbed(att, bag.attsCache[key], att.Annotation)
+				}
 			}
 		}
-		for _, att := range me.Attributes {
-			if key := bag.attsKeys[att]; len(key) > 0 {
-				td.addEmbed(att, bag.attsCache[key], att.Annotation)
-			}
-		}
-	}
-	me.elemBase.afterMakePkg(bag)
+		me.elemBase.afterMakePkg(bag)
 }
 
 func (me *Choice) makePkg(bag *PkgBag) {
@@ -162,191 +150,192 @@ func (me *ComplexContent) makePkg(bag *PkgBag) {
 }
 
 func (me *ComplexType) makePkg(bag *PkgBag) {
-	var att *Attribute
-	var attGroup *AttributeGroup
-	var ctBaseType, ctValueType, typeSafeName string
-	var allAtts = map[*Attribute]bool{}
-	var allAttGroups = map[*AttributeGroup]bool{}
-	var allElems = map[*Element]bool{}
-	var allElemGroups = map[*Group]bool{}
-	var elsDone, grsDone = map[string]bool{}, map[string]bool{}
-	var allChoices, tmpChoices = []*Choice{}, []*Choice{me.Choice}
-	var allSeqs, tmpSeqs = []*Sequence{}, []*Sequence{me.Sequence}
-	var el *Element
-	var elGr *Group
-	var mixed = false
-	me.elemBase.beforeMakePkg(bag)
-	me.hasElemsAttribute.makePkg(bag)
-	me.hasElemsAnyAttribute.makePkg(bag)
-	me.hasElemsAttributeGroup.makePkg(bag)
-	me.hasElemAll.makePkg(bag)
-	me.hasElemChoice.makePkg(bag)
-	me.hasElemGroup.makePkg(bag)
-	me.hasElemSequence.makePkg(bag)
-	me.hasElemComplexContent.makePkg(bag)
-	me.hasElemSimpleContent.makePkg(bag)
-	if len(me.Name) == 0 {
-		me.Name = bag.AnonName(me.longSafeName(bag))
-	}
-	//typeSafeName = bag.safeName(ustr.PrependIf(me.Name.String(), "T"))
-	typeSafeName = bag.safeName(me.Name.String())
-	var td = bag.addType(me, typeSafeName, "", me.Annotation)
-	for _, att = range me.Attributes {
-		allAtts[att] = true
-	}
-	for _, attGroup = range me.AttributeGroups {
-		allAttGroups[attGroup] = true
-	}
-	allChoices, allSeqs = Flattened(tmpChoices, tmpSeqs)
-	if me.All != nil {
-		for _, el = range me.All.Elements {
-			allElems[el] = true
+	log.Println("ComplexType makepkg")
+		var att *Attribute
+		var attGroup *AttributeGroup
+		var ctBaseType, ctValueType, typeSafeName string
+		var allAtts = map[*Attribute]bool{}
+		var allAttGroups = map[*AttributeGroup]bool{}
+		var allElems = map[*Element]bool{}
+		var allElemGroups = map[*Group]bool{}
+		var elsDone, grsDone = map[string]bool{}, map[string]bool{}
+		var allChoices, tmpChoices = []*Choice{}, []*Choice{me.Choice}
+		var allSeqs, tmpSeqs = []*Sequence{}, []*Sequence{me.Sequence}
+		var el *Element
+		var elGr *Group
+		var mixed = false
+		me.elemBase.beforeMakePkg(bag)
+		me.hasElemsAttribute.makePkg(bag)
+		me.hasElemsAnyAttribute.makePkg(bag)
+		me.hasElemsAttributeGroup.makePkg(bag)
+		me.hasElemAll.makePkg(bag)
+		me.hasElemChoice.makePkg(bag)
+		me.hasElemGroup.makePkg(bag)
+		me.hasElemSequence.makePkg(bag)
+		me.hasElemComplexContent.makePkg(bag)
+		me.hasElemSimpleContent.makePkg(bag)
+		if len(me.Name) == 0 {
+			me.Name = bag.AnonName(me.longSafeName(bag))
 		}
-	}
-	if me.Group != nil {
-		allElemGroups[me.Group] = true
-	}
-	if mixed = me.Mixed; me.ComplexContent != nil {
-		mixed = mixed || me.ComplexContent.Mixed
-		td.addAnnotations(me.ComplexContent.Annotation)
-		if me.ComplexContent.ExtensionComplexContent != nil {
-			td.addAnnotations(me.ComplexContent.ExtensionComplexContent.Annotation)
-			if me.ComplexContent.ExtensionComplexContent.All != nil {
-				for _, el = range me.ComplexContent.ExtensionComplexContent.All.Elements {
-					allElems[el] = true
+		//typeSafeName = bag.safeName(ustr.PrependIf(me.Name.String(), "T"))
+		typeSafeName = bag.safeName(me.Name.String())
+		var td = bag.addType(me, typeSafeName, "", me.Annotation)
+		for _, att = range me.Attributes {
+			allAtts[att] = true
+		}
+		for _, attGroup = range me.AttributeGroups {
+			allAttGroups[attGroup] = true
+		}
+		allChoices, allSeqs = Flattened(tmpChoices, tmpSeqs)
+		if me.All != nil {
+			for _, el = range me.All.Elements {
+				allElems[el] = true
+			}
+		}
+		if me.Group != nil {
+			allElemGroups[me.Group] = true
+		}
+		if mixed = me.Mixed; me.ComplexContent != nil {
+			mixed = mixed || me.ComplexContent.Mixed
+			td.addAnnotations(me.ComplexContent.Annotation)
+			if me.ComplexContent.ExtensionComplexContent != nil {
+				td.addAnnotations(me.ComplexContent.ExtensionComplexContent.Annotation)
+				if me.ComplexContent.ExtensionComplexContent.All != nil {
+					for _, el = range me.ComplexContent.ExtensionComplexContent.All.Elements {
+						allElems[el] = true
+					}
+				}
+				for _, elGr = range me.ComplexContent.ExtensionComplexContent.Groups {
+					allElemGroups[elGr] = true
+				}
+				tmpChoices, tmpSeqs = Flattened(me.ComplexContent.ExtensionComplexContent.Choices, me.ComplexContent.ExtensionComplexContent.Sequences)
+				allChoices, allSeqs = append(allChoices, tmpChoices...), append(allSeqs, tmpSeqs...)
+				for _, att = range me.ComplexContent.ExtensionComplexContent.Attributes {
+					allAtts[att] = true
+				}
+				for _, attGroup = range me.ComplexContent.ExtensionComplexContent.AttributeGroups {
+					allAttGroups[attGroup] = true
+				}
+				if len(me.ComplexContent.ExtensionComplexContent.Base) > 0 {
+					ctBaseType = me.ComplexContent.ExtensionComplexContent.Base.String()
 				}
 			}
-			for _, elGr = range me.ComplexContent.ExtensionComplexContent.Groups {
-				allElemGroups[elGr] = true
-			}
-			tmpChoices, tmpSeqs = Flattened(me.ComplexContent.ExtensionComplexContent.Choices, me.ComplexContent.ExtensionComplexContent.Sequences)
-			allChoices, allSeqs = append(allChoices, tmpChoices...), append(allSeqs, tmpSeqs...)
-			for _, att = range me.ComplexContent.ExtensionComplexContent.Attributes {
-				allAtts[att] = true
-			}
-			for _, attGroup = range me.ComplexContent.ExtensionComplexContent.AttributeGroups {
-				allAttGroups[attGroup] = true
-			}
-			if len(me.ComplexContent.ExtensionComplexContent.Base) > 0 {
-				ctBaseType = me.ComplexContent.ExtensionComplexContent.Base.String()
-			}
-		}
-		if me.ComplexContent.RestrictionComplexContent != nil {
-			td.addAnnotations(me.ComplexContent.RestrictionComplexContent.Annotation)
-			if me.ComplexContent.RestrictionComplexContent.All != nil {
-				for _, el = range me.ComplexContent.RestrictionComplexContent.All.Elements {
-					allElems[el] = true
+			if me.ComplexContent.RestrictionComplexContent != nil {
+				td.addAnnotations(me.ComplexContent.RestrictionComplexContent.Annotation)
+				if me.ComplexContent.RestrictionComplexContent.All != nil {
+					for _, el = range me.ComplexContent.RestrictionComplexContent.All.Elements {
+						allElems[el] = true
+					}
+				}
+				tmpChoices, tmpSeqs = Flattened(me.ComplexContent.RestrictionComplexContent.Choices, me.ComplexContent.RestrictionComplexContent.Sequences)
+				allChoices, allSeqs = append(allChoices, tmpChoices...), append(allSeqs, tmpSeqs...)
+				for _, att = range me.ComplexContent.RestrictionComplexContent.Attributes {
+					allAtts[att] = true
+				}
+				for _, attGroup = range me.ComplexContent.RestrictionComplexContent.AttributeGroups {
+					allAttGroups[attGroup] = true
+				}
+				if len(me.ComplexContent.RestrictionComplexContent.Base) > 0 {
+					ctBaseType = me.ComplexContent.RestrictionComplexContent.Base.String()
 				}
 			}
-			tmpChoices, tmpSeqs = Flattened(me.ComplexContent.RestrictionComplexContent.Choices, me.ComplexContent.RestrictionComplexContent.Sequences)
-			allChoices, allSeqs = append(allChoices, tmpChoices...), append(allSeqs, tmpSeqs...)
-			for _, att = range me.ComplexContent.RestrictionComplexContent.Attributes {
-				allAtts[att] = true
+		}
+		if me.SimpleContent != nil {
+			td.addAnnotations(me.SimpleContent.Annotation)
+			if me.SimpleContent.ExtensionSimpleContent != nil {
+				if len(me.SimpleContent.ExtensionSimpleContent.Base) > 0 {
+					ctBaseType = me.SimpleContent.ExtensionSimpleContent.Base.String()
+				}
+				td.addAnnotations(me.SimpleContent.ExtensionSimpleContent.Annotation)
+				for _, att = range me.SimpleContent.ExtensionSimpleContent.Attributes {
+					allAtts[att] = true
+				}
+				for _, attGroup = range me.SimpleContent.ExtensionSimpleContent.AttributeGroups {
+					allAttGroups[attGroup] = true
+				}
+				if (len(ctValueType) == 0) && (len(me.SimpleContent.ExtensionSimpleContent.Base) > 0) {
+					ctValueType = me.SimpleContent.ExtensionSimpleContent.Base.String()
+				}
 			}
-			for _, attGroup = range me.ComplexContent.RestrictionComplexContent.AttributeGroups {
-				allAttGroups[attGroup] = true
-			}
-			if len(me.ComplexContent.RestrictionComplexContent.Base) > 0 {
-				ctBaseType = me.ComplexContent.RestrictionComplexContent.Base.String()
+			if me.SimpleContent.RestrictionSimpleContent != nil {
+				if len(me.SimpleContent.RestrictionSimpleContent.Base) > 0 {
+					ctBaseType = me.SimpleContent.RestrictionSimpleContent.Base.String()
+				}
+				td.addAnnotations(me.SimpleContent.RestrictionSimpleContent.Annotation)
+				for _, att = range me.SimpleContent.RestrictionSimpleContent.Attributes {
+					allAtts[att] = true
+				}
+				for _, attGroup = range me.SimpleContent.RestrictionSimpleContent.AttributeGroups {
+					allAttGroups[attGroup] = true
+				}
+				if (len(ctValueType) == 0) && (len(me.SimpleContent.RestrictionSimpleContent.Base) > 0) {
+					ctValueType = me.SimpleContent.RestrictionSimpleContent.Base.String()
+				}
+				if (len(ctValueType) == 0) && (len(me.SimpleContent.RestrictionSimpleContent.SimpleTypes) > 0) {
+					ctValueType = me.SimpleContent.RestrictionSimpleContent.SimpleTypes[0].Name.String()
+				}
+				for _, enum := range me.SimpleContent.RestrictionSimpleContent.Enumerations {
+					println("ENUMTODO!?! Whoever sees this message, please post an issue at github.com/metaleap/go-xsd with a link to the XSD..." + enum.selfName().String())
+				}
 			}
 		}
-	}
-	if me.SimpleContent != nil {
-		td.addAnnotations(me.SimpleContent.Annotation)
-		if me.SimpleContent.ExtensionSimpleContent != nil {
-			if len(me.SimpleContent.ExtensionSimpleContent.Base) > 0 {
-				ctBaseType = me.SimpleContent.ExtensionSimpleContent.Base.String()
+		if ctBaseType = bag.resolveQnameRef(ctBaseType, "T", nil); len(ctBaseType) > 0 {
+			td.addEmbed(nil, bag.safeName(ctBaseType))
+		} else if ctValueType = bag.resolveQnameRef(ctValueType, "T", nil); len(ctValueType) > 0 {
+			bag.simpleContentValueTypes[typeSafeName] = ctValueType
+			td.addField(nil, idPrefix+"Value", ctValueType, ",chardata")
+			chain := sfmt("me.%vValue", idPrefix)
+			td.addMethod(nil, "*"+typeSafeName, sfmt("To%v", bag.safeName(ctValueType)), ctValueType, sfmt("return %v", chain), sfmt("Simply returns the value of its %vValue field.", idPrefix))
+			ttn := ctValueType
+			for ttd := bag.declTypes[ctValueType]; ttd != nil; ttd = bag.declTypes[ttn] {
+				if ttd != nil {
+					bag.declConvs[ttd.Name] = true
+				}
+				if ttn = ttd.Type; len(ttn) > 0 {
+					chain += sfmt(".To%v()", bag.safeName(ttn))
+					td.addMethod(nil, "*"+typeSafeName, sfmt("To%v", bag.safeName(ttn)), ttn, sfmt("return %v", chain), sfmt("Returns the value of its %vValue field as a %v (which %v is just aliasing).", idPrefix, ttn, ctValueType))
+				} else {
+					break
+				}
 			}
-			td.addAnnotations(me.SimpleContent.ExtensionSimpleContent.Annotation)
-			for _, att = range me.SimpleContent.ExtensionSimpleContent.Attributes {
-				allAtts[att] = true
+			if (!strings.HasPrefix(ctValueType, "xsdt.")) && (bag.declTypes[ctValueType] == nil) {
+				println("NOTFOUND: " + ctValueType)
 			}
-			for _, attGroup = range me.SimpleContent.ExtensionSimpleContent.AttributeGroups {
-				allAttGroups[attGroup] = true
+		} else if mixed {
+			td.addEmbed(nil, idPrefix+"HasCdata")
+		}
+		for elGr, _ = range allElemGroups {
+			subMakeElemGroup(bag, td, elGr, grsDone, anns(nil, me.ComplexContent)...)
+		}
+		for el, _ = range allElems {
+			subMakeElem(bag, td, el, elsDone, 1, anns(me.All, nil)...)
+		}
+		for _, ch := range allChoices {
+			for _, el = range ch.Elements {
+				subMakeElem(bag, td, el, elsDone, ch.hasAttrMaxOccurs.Value(), ch.Annotation)
 			}
-			if (len(ctValueType) == 0) && (len(me.SimpleContent.ExtensionSimpleContent.Base) > 0) {
-				ctValueType = me.SimpleContent.ExtensionSimpleContent.Base.String()
+			for _, elGr = range ch.Groups {
+				subMakeElemGroup(bag, td, elGr, grsDone, ch.Annotation)
 			}
 		}
-		if me.SimpleContent.RestrictionSimpleContent != nil {
-			if len(me.SimpleContent.RestrictionSimpleContent.Base) > 0 {
-				ctBaseType = me.SimpleContent.RestrictionSimpleContent.Base.String()
+		for _, seq := range allSeqs {
+			for _, el = range seq.Elements {
+				subMakeElem(bag, td, el, elsDone, seq.hasAttrMaxOccurs.Value(), seq.Annotation)
 			}
-			td.addAnnotations(me.SimpleContent.RestrictionSimpleContent.Annotation)
-			for _, att = range me.SimpleContent.RestrictionSimpleContent.Attributes {
-				allAtts[att] = true
-			}
-			for _, attGroup = range me.SimpleContent.RestrictionSimpleContent.AttributeGroups {
-				allAttGroups[attGroup] = true
-			}
-			if (len(ctValueType) == 0) && (len(me.SimpleContent.RestrictionSimpleContent.Base) > 0) {
-				ctValueType = me.SimpleContent.RestrictionSimpleContent.Base.String()
-			}
-			if (len(ctValueType) == 0) && (len(me.SimpleContent.RestrictionSimpleContent.SimpleTypes) > 0) {
-				ctValueType = me.SimpleContent.RestrictionSimpleContent.SimpleTypes[0].Name.String()
-			}
-			for _, enum := range me.SimpleContent.RestrictionSimpleContent.Enumerations {
-				println("ENUMTODO!?! Whoever sees this message, please post an issue at github.com/metaleap/go-xsd with a link to the XSD..." + enum.selfName().String())
+			for _, elGr = range seq.Groups {
+				subMakeElemGroup(bag, td, elGr, grsDone, seq.Annotation)
 			}
 		}
-	}
-	if ctBaseType = bag.resolveQnameRef(ctBaseType, "T", nil); len(ctBaseType) > 0 {
-		td.addEmbed(nil, bag.safeName(ctBaseType))
-	} else if ctValueType = bag.resolveQnameRef(ctValueType, "T", nil); len(ctValueType) > 0 {
-		bag.simpleContentValueTypes[typeSafeName] = ctValueType
-		td.addField(nil, idPrefix+"Value", ctValueType, ",chardata")
-		chain := sfmt("me.%vValue", idPrefix)
-		td.addMethod(nil, "*"+typeSafeName, sfmt("To%v", bag.safeName(ctValueType)), ctValueType, sfmt("return %v", chain), sfmt("Simply returns the value of its %vValue field.", idPrefix))
-		ttn := ctValueType
-		for ttd := bag.declTypes[ctValueType]; ttd != nil; ttd = bag.declTypes[ttn] {
-			if ttd != nil {
-				bag.declConvs[ttd.Name] = true
-			}
-			if ttn = ttd.Type; len(ttn) > 0 {
-				chain += sfmt(".To%v()", bag.safeName(ttn))
-				td.addMethod(nil, "*"+typeSafeName, sfmt("To%v", bag.safeName(ttn)), ttn, sfmt("return %v", chain), sfmt("Returns the value of its %vValue field as a %v (which %v is just aliasing).", idPrefix, ttn, ctValueType))
-			} else {
-				break
-			}
+		for attGroup, _ = range allAttGroups {
+			td.addEmbed(attGroup, ustr.PrefixWithSep(bag.attGroupRefImps[attGroup], ".", bag.attGroups[attGroup][(strings.Index(bag.attGroups[attGroup], ".")+1):]), attGroup.Annotation)
 		}
-		if (!strings.HasPrefix(ctValueType, "xsdt.")) && (bag.declTypes[ctValueType] == nil) {
-			println("NOTFOUND: " + ctValueType)
-		}
-	} else if mixed {
-		td.addEmbed(nil, idPrefix+"HasCdata")
-	}
-	for elGr, _ = range allElemGroups {
-		subMakeElemGroup(bag, td, elGr, grsDone, anns(nil, me.ComplexContent)...)
-	}
-	for el, _ = range allElems {
-		subMakeElem(bag, td, el, elsDone, 1, anns(me.All, nil)...)
-	}
-	for _, ch := range allChoices {
-		for _, el = range ch.Elements {
-			subMakeElem(bag, td, el, elsDone, ch.hasAttrMaxOccurs.Value(), ch.Annotation)
-		}
-		for _, elGr = range ch.Groups {
-			subMakeElemGroup(bag, td, elGr, grsDone, ch.Annotation)
-		}
-	}
-	for _, seq := range allSeqs {
-		for _, el = range seq.Elements {
-			subMakeElem(bag, td, el, elsDone, seq.hasAttrMaxOccurs.Value(), seq.Annotation)
-		}
-		for _, elGr = range seq.Groups {
-			subMakeElemGroup(bag, td, elGr, grsDone, seq.Annotation)
-		}
-	}
-	for attGroup, _ = range allAttGroups {
-		td.addEmbed(attGroup, ustr.PrefixWithSep(bag.attGroupRefImps[attGroup], ".", bag.attGroups[attGroup][(strings.Index(bag.attGroups[attGroup], ".")+1):]), attGroup.Annotation)
-	}
 
-	for att, _ = range allAtts {
-		if key := bag.attsKeys[att]; len(key) > 0 {
-			td.addEmbed(att, ustr.PrefixWithSep(bag.attRefImps[att], ".", bag.attsCache[key][(strings.Index(bag.attsCache[key], ".")+1):]), att.Annotation)
+		for att, _ = range allAtts {
+			if key := bag.attsKeys[att]; len(key) > 0 {
+				td.addEmbed(att, ustr.PrefixWithSep(bag.attRefImps[att], ".", bag.attsCache[key][(strings.Index(bag.attsCache[key], ".")+1):]), att.Annotation)
+			}
 		}
-	}
-	me.elemBase.afterMakePkg(bag)
+		me.elemBase.afterMakePkg(bag)
 }
 
 func (me *Documentation) makePkg(bag *PkgBag) {
@@ -395,12 +384,10 @@ func (me *Element) makePkg(bag *PkgBag) {
 				typeName = bag.xsdStringTypeRef()
 			}
 			log.Println("would resolveQnam")
-			/*
 				loadedSchemas := make(map[string]bool)
 					if typeName = bag.resolveQnameRef(typeName, "T", &impName); bag.Schema.RootSchema([]string{bag.Schema.loadUri}).globalComplexType(bag, typeName, loadedSchemas) != nil {
 						asterisk = "*"
 					}
-			*/
 		}
 		if defVal = me.Default; len(defVal) == 0 {
 			defName, defVal = "Fixed", me.Fixed
@@ -450,23 +437,23 @@ func (me *Element) makePkg(bag *PkgBag) {
 }
 
 func (me *ExtensionComplexContent) makePkg(bag *PkgBag) {
-	me.elemBase.beforeMakePkg(bag)
-	me.hasElemsAttribute.makePkg(bag)
-	me.hasElemsAnyAttribute.makePkg(bag)
-	me.hasElemsAttributeGroup.makePkg(bag)
-	me.hasElemAll.makePkg(bag)
-	me.hasElemsChoice.makePkg(bag)
-	me.hasElemsGroup.makePkg(bag)
-	me.hasElemsSequence.makePkg(bag)
-	me.elemBase.afterMakePkg(bag)
+		me.elemBase.beforeMakePkg(bag)
+		me.hasElemsAttribute.makePkg(bag)
+		me.hasElemsAnyAttribute.makePkg(bag)
+		me.hasElemsAttributeGroup.makePkg(bag)
+		me.hasElemAll.makePkg(bag)
+		me.hasElemsChoice.makePkg(bag)
+		me.hasElemsGroup.makePkg(bag)
+		me.hasElemsSequence.makePkg(bag)
+		me.elemBase.afterMakePkg(bag)
 }
 
 func (me *ExtensionSimpleContent) makePkg(bag *PkgBag) {
-	me.elemBase.beforeMakePkg(bag)
-	me.hasElemsAttribute.makePkg(bag)
-	me.hasElemsAnyAttribute.makePkg(bag)
-	me.hasElemsAttributeGroup.makePkg(bag)
-	me.elemBase.afterMakePkg(bag)
+		me.elemBase.beforeMakePkg(bag)
+		me.hasElemsAttribute.makePkg(bag)
+		me.hasElemsAnyAttribute.makePkg(bag)
+		me.hasElemsAttributeGroup.makePkg(bag)
+		me.elemBase.afterMakePkg(bag)
 }
 
 func (me *Field) makePkg(bag *PkgBag) {
@@ -525,26 +512,26 @@ func (me *Group) makePkg(bag *PkgBag) {
 }
 
 func (me *Import) makePkg(bag *PkgBag) {
-	me.elemBase.beforeMakePkg(bag)
-	var impName, impPath string
-	var pos int
-	me.hasElemAnnotation.makePkg(bag)
-	for k, v := range bag.Schema.XMLNamespaces {
-		if v == me.Namespace {
-			impName = k
-			break
+		me.elemBase.beforeMakePkg(bag)
+		var impName, impPath string
+		var pos int
+		me.hasElemAnnotation.makePkg(bag)
+		for k, v := range bag.Schema.XMLNamespaces {
+			if v == me.Namespace {
+				impName = k
+				break
+			}
 		}
-	}
-	if len(impName) > 0 {
-		if pos, impPath = strings.Index(me.SchemaLocation.String(), protSep), me.SchemaLocation.String(); pos > 0 {
-			impPath = impPath[pos+len(protSep):]
-		} else {
-			impPath = path.Join(path.Dir(bag.Schema.loadUri), impPath)
+		if len(impName) > 0 {
+			if pos, impPath = strings.Index(me.SchemaLocation.String(), protSep), me.SchemaLocation.String(); pos > 0 {
+				impPath = impPath[pos+len(protSep):]
+			} else {
+				impPath = path.Join(path.Dir(bag.Schema.loadUri), impPath)
+			}
+			impPath = path.Join(path.Dir(impPath), goPkgPrefix+path.Base(impPath)+goPkgSuffix)
+			bag.imports[impName] = path.Join(PkgGen.BasePath, impPath)
 		}
-		impPath = path.Join(path.Dir(impPath), goPkgPrefix+path.Base(impPath)+goPkgSuffix)
-		bag.imports[impName] = path.Join(PkgGen.BasePath, impPath)
-	}
-	me.elemBase.afterMakePkg(bag)
+		me.elemBase.afterMakePkg(bag)
 }
 
 func (me *Key) makePkg(bag *PkgBag) {
@@ -582,11 +569,12 @@ func (me *List) makePkg(bag *PkgBag) {
 	me.elemBase.afterMakePkg(bag)
 }
 
+/*
 func (me *Notation) makePkg(bag *PkgBag) {
-	me.elemBase.beforeMakePkg(bag)
-	me.hasElemAnnotation.makePkg(bag)
-	bag.appendFmt(false, "%vNotations.Add(%#v, %#v, %#v, %#v)", idPrefix, me.Id, me.Name, me.Public, me.System)
-	me.elemBase.afterMakePkg(bag)
+		me.elemBase.beforeMakePkg(bag)
+		me.hasElemAnnotation.makePkg(bag)
+		bag.appendFmt(false, "%vNotations.Add(%#v, %#v, %#v, %#v)", idPrefix, me.Id, me.Name, me.Public, me.System)
+		me.elemBase.afterMakePkg(bag)
 }
 
 func (me *Redefine) makePkg(bag *PkgBag) {
@@ -848,9 +836,6 @@ func pluralize(s string) string {
 	return ustr.Pluralize(s)
 }
 
-func sfmt(s string, a ...interface{}) string {
-	return fmt.Sprintf(s, a...)
-}
 
 func subMakeElem(bag *PkgBag, td *declType, el *Element, done map[string]bool, parentMaxOccurs xsdt.Long, anns ...*Annotation) {
 	var elCache map[string]string
@@ -875,3 +860,4 @@ func subMakeElemGroup(bag *PkgBag, td *declType, gr *Group, done map[string]bool
 		}
 	}
 }
+*/
